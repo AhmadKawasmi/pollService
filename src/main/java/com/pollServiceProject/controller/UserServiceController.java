@@ -17,8 +17,11 @@ public class UserServiceController {
     public UserServiceResponse getUserById(@PathVariable Long userId){
        return userService.getUserById(userId);
     }
+
+
     @GetMapping("/check-registration/{userId}")
     public Boolean isUserRegistered(@PathVariable Long userId){
         return userService.isUserRegistered(userId);
     }
+
 }

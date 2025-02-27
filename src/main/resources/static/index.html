@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poll Application</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        /* General styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-top: 20px;
+        }
+
+        /* Container for the form */
+        #pollSection {
+            width: 80%;
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Input and button styling */
+        input[type="number"] {
+            width: 50%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* Error message styling */
+        #error {
+            text-align: center;
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        /* Styling for each question block */
+        .question-block {
+            margin-bottom: 30px;
+        }
+
+        .question-block h2 {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        /* Answer options */
+        .answers {
+            margin-left: 20px;
+        }
+
+        .answers div {
+            margin-bottom: 10px;
+        }
+
+        .answers input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        .answers label {
+            font-size: 1em;
+            color: #555;
+        }
+
+        /* Submit button */
+        #pollForm button {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        /* Responsive styling for smaller screens */
+        @media (max-width: 600px) {
+            body {
+                padding: 20px;
+            }
+
+            #pollSection {
+                width: 100%;
+                padding: 15px;
+            }
+
+            input[type="number"] {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Poll Service</h1>
+
+<!-- User ID Input -->
+<div>
+    <label for="userId">User ID:</label>
+    <input type="number" id="userId" min="1" required>
+    <button id="loadQuestions">Load Questions</button>
+</div>
+
+<!-- Poll Question Section -->
+<div id="pollSection" style="display: none;">
+    <form id="pollForm">
+        <div id="questionsContainer"></div>
+        <button type="submit">Submit Answers</button>
+    </form>
+</div>
+
+<!-- Error Message Section -->
+<div id="error" style="color: red;"></div>
+
+<script>
+    const baseUrl = 'http://localhost:8082'; // Adjust if backend runs on a different port
+
+    // Prevent answering the same question twice
+    const answeredQuestions = new Set();
+
+    let allQuestions = [];  // Array to hold all question data
+
+    // Load all questions for the user
+    $('#loadQuestions').click(() => {
+        const userId = $('#userId').val();
+        if (!userId) {
+            $('#error').text('Please enter a valid User ID.');
+            return;
+        }
+
+        // Step 1: Check if user is registered
+        $.ajax({
+            url: `${baseUrl}/user-service-client/check-registration/${userId}`,
+            method: 'GET',
+            success: (isRegistered) => {
+                if (isRegistered) {
+                    // If user exists, load all questions
+                    fetchQuestionsForUser(userId);
+                } else {
+                    $('#error').text('User not registered.');
+                }
+            },
+            error: () => {
+                $('#error').text('Failed to validate user. Please try again.');
+            }
+        });
+    });
+
+    // Fetch available question IDs if the user is registered
+    function fetchQuestionsForUser(userId) {
+        $.ajax({
+            url: `${baseUrl}/poll-service/all-question-ids`,
+            method: 'GET',
+            success: (data) => {
+                if (data.length > 0) {
+                    loadAllQuestions(data);
+                } else {
+                    $('#error').text('No questions available.');
+                }
+            },
+            error: () => {
+                $('#error').text('Failed to load questions. Please try again.');
+            },
+        });
+    }
+
+    // Fetch all questions and display them
+    function loadAllQuestions(questionIds) {
+        allQuestions = [];
+        $('#questionsContainer').empty(); // Clear the container before adding questions
+
+        // Fetch question details for each question ID
+        let requests = questionIds.map(questionId => {
+            return $.ajax({
+                url: `${baseUrl}/poll-service/${questionId}`,
+                method: 'GET',
+                success: (data) => {
+                    allQuestions.push(data);  // Store the fetched question data
+                },
+                error: () => {
+                    $('#error').text('Failed to load the question details.');
+                },
+            });
+        });
+
+        // After all questions are fetched, display them
+        $.when.apply($, requests).done(() => {
+            displayAllQuestions();  // Display all questions after all are fetched
+        });
+    }
+
+    // Display all questions and their answers
+    function displayAllQuestions() {
+        $('#pollSection').show();
+
+        allQuestions.forEach((data, index) => {
+            const questionBlock = `
+                <div class="question-block">
+                    <h2>${data.title}</h2>
+                    <div class="answers">
+                        ${getAnswerOptions(data)}
+                    </div>
+                </div>
+            `;
+            $('#questionsContainer').append(questionBlock);
+        });
+    }
+
+    // Generate answer options for each question
+    function getAnswerOptions(data) {
+        const answers = [data.firstAnswer, data.secondAnswer, data.thirdAnswer, data.fourthAnswer]
+            .filter(answer => answer && answer.trim() !== "");  // Remove null/empty answers
+
+        let answerHTML = '';
+        answers.forEach((answer, index) => {
+            answerHTML += `
+                <div>
+                    <input type="radio" id="answer${data.id}-${index}" name="answer-${data.id}" value="${answer}" required>
+                    <label for="answer${data.id}-${index}">${answer}</label>
+                </div>
+            `;
+        });
+        return answerHTML;
+    }
+
+    // Submit all answers individually
+    $('#pollForm').submit(function (e) {
+        e.preventDefault();
+
+        const userId = $('#userId').val();
+
+        // Loop through all questions and send a POST request for each answer
+        let allRequests = [];
+
+        allQuestions.forEach((data) => {
+            const selectedAnswer = $(`input[name="answer-${data.id}"]:checked`).val();
+
+            if (!selectedAnswer) {
+                $('#error').text('Please select an answer for all questions.');
+                return;
+            }
+
+            // Construct payload for each question
+            const payload = {
+                userId: parseInt(userId, 10),
+                pollAnswer: {
+                    questionId: data.id,
+                    answer: selectedAnswer
+                }
+            };
+
+            // Send each question answer in a separate POST request
+            allRequests.push(
+                $.ajax({
+                    url: `${baseUrl}/poll-answer/create`,
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    success: () => {
+                        answeredQuestions.add(data.id);
+                    },
+                    error: () => {
+                        $('#error').text('Failed to submit an answer. Please try again.');
+                    }
+                })
+            );
+        });
+
+        // When all requests have completed, show success
+        $.when.apply($, allRequests).done(function() {
+            $('#error').text('');
+            $('#pollSection').hide();
+            alert('All answers submitted successfully!');
+        });
+    });
+</script>
+
+</body>
+</html>

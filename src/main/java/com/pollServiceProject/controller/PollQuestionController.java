@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+
+@CrossOrigin(origins = "http://localhost:8082") // Allow frontend calls
 @RestController
 @RequestMapping("/poll-service")
 public class PollQuestionController {

@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+
 /**
  * Controller for handling poll answer operations.
  */
+@CrossOrigin(origins = "http://localhost:8082") // Allow frontend calls
+
 @RestController
 @RequestMapping("/poll-answer")
 public class PollAnswerController {
